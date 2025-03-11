@@ -1,0 +1,173 @@
+import pygame  
+import time  
+import math  
+  
+# Initialize Pygame  
+pygame.init()  
+  
+# Set up display  
+screen = pygame.display.set_mode((640, 480))  
+pygame.display.set_caption("Clicker Game")  
+  
+# Set up fonts  
+font_score = pygame.font.Font(None, 36)  
+font_label = pygame.font.Font(None, 24)  # Smaller font for the label  
+font_box = pygame.font.Font(None, 18)  # Smaller font for box names and costs  
+  
+# Initialize score, clicking value, and cookies per second  
+score = 0  
+click_value = 1  
+cookies_per_second = 0  
+  
+# Load images and resize the background to fit the screen  
+cookie_image = pygame.image.load("Cookie.png")  
+cookie_image = pygame.transform.scale(cookie_image, (260, 260))  # Resize to maintain aspect ratio  
+background_image = pygame.image.load("Wallpaper.png")  
+background_image = pygame.transform.scale(background_image, (640, 480))  # Resize to fit the screen  
+  
+# Square properties for first set  
+square_width = 80  
+square_height = 80  
+num_squares = 8  
+start_x = 320  
+start_y = 0  
+  
+# Additional boxes properties and costs  
+additional_box_height = 133  # Each box height to evenly divide the section  
+additional_box_width = 320  # Fill the bottom right section width  
+additional_boxes = [  
+    {"name": "Bakery", "cost": 1000, "x": 320, "y": 160, "purchases": 0, "cps": 50},  
+    {"name": "Factory", "cost": 10000, "x": 320, "y": 160 + additional_box_height, "purchases": 0, "cps": 2000},  
+    {"name": "Interstellar Cookie Production Facility", "cost": 1000000, "x": 320, "y": 160 + 2 * additional_box_height, "purchases": 0, "cps": 100000}  
+]  
+  
+# Costs array for first set  
+costs = [50 * (2 ** i) for i in range(num_squares)]  
+purchased = [False] * num_squares  # Track purchased boxes for first set  
+  
+# Last time for updating cookies per second  
+last_update_time = time.time()  
+  
+# Wobble effect variables  
+wobble_duration = 0.3  # Duration in seconds  
+wobble_start_time = None  
+  
+# Victory condition  
+victory_cookies = 10**14  # 100 trillion cookies  
+game_won = False  
+  
+# Main loop  
+running = True  
+while running:  
+    if game_won:  
+        # Display victory screen  
+        screen.fill((0, 255, 0))  # Green background  
+        victory_text = font_score.render("You conquered the universe with your cookies!", True, (0, 0, 0))  
+        cookies_text = font_score.render(f"Total Cookies: {score}", True, (0, 0, 0))  
+        cps_text = font_score.render(f"Cookies per Second: {cookies_per_second}", True, (0, 0, 0))  
+        screen.blit(victory_text, (50, 150))  
+        screen.blit(cookies_text, (50, 200))  
+        screen.blit(cps_text, (50, 250))  
+        pygame.display.flip()  
+        pygame.time.wait(5000)  # Display for 5 seconds  
+        break  
+  
+    current_time = time.time()  
+    elapsed_time = current_time - last_update_time  
+    if elapsed_time >= 1:  # Update every second  
+        for box in additional_boxes:  
+            score += box["purchases"] * box["cps"]  
+        last_update_time = current_time  
+  
+    for event in pygame.event.get():  
+        if event.type == pygame.QUIT:  
+            running = False  
+        elif event.type == pygame.MOUSEBUTTONDOWN:  
+            mouse_x, mouse_y = event.pos  
+            # Check if the click is inside the cookie  
+            cookie_rect = cookie_image.get_rect(topleft=(30, 200))  # Move cookie slightly up  
+            if cookie_rect.collidepoint(mouse_x, mouse_y):  
+                score += click_value  
+                wobble_start_time = time.time()  # Start wobble effect  
+  
+            # Check if a box in the first set is clicked  
+            for i in range(num_squares):  
+                x = start_x + (i % 4) * square_width  
+                y = start_y + (i // 4) * square_height  
+                box_rect = pygame.Rect(x, y, square_width, square_height)  
+                if box_rect.collidepoint(mouse_x, mouse_y) and score >= costs[i] and not purchased[i]:  
+                    score -= costs[i]  
+                    click_value *= 2  
+                    purchased[i] = True  
+  
+            # Check if an additional box is clicked  
+            for box in additional_boxes:  
+                box_rect = pygame.Rect(box["x"], box["y"], additional_box_width, additional_box_height)  
+                if box_rect.collidepoint(mouse_x, mouse_y) and score >= box["cost"]:  
+                    score -= box["cost"]  
+                    box["purchases"] += 1  
+                    cookies_per_second += box["cps"]  
+                    box["cost"] = int(box["cost"] * 1.1)  # Scale cost by 1.1x  
+  
+    # Check for victory condition  
+    if score >= victory_cookies:  
+        game_won = True  
+        continue  
+  
+    # Draw the resized background image  
+    screen.blit(background_image, (0, 0))  
+  
+    # Draw a vertical line in the middle  
+    pygame.draw.line(screen, (0, 0, 0), (320, 0), (320, 480), 2)  
+  
+    # Draw a horizontal line dividing the top third of the right section  
+    pygame.draw.line(screen, (0, 0, 0), (320, 160), (640, 160), 2)  
+  
+    # Render the score text  
+    score_text = font_score.render(str(score), True, (0, 0, 0))  
+    screen.blit(score_text, (100, 75))  # Moved to the left side  
+  
+    # Render the "Cookies:" label above the score  
+    label_text = font_label.render("Cookies:", True, (0, 0, 0))  
+    screen.blit(label_text, (100, 50))  
+  
+    # Render the cookies per second  
+    cps_text = font_label.render(f"Cookies per Second: {cookies_per_second}", True, (0, 0, 0))  
+    screen.blit(cps_text, (100, 100))  
+  
+    # Calculate wobble effect  
+    wobble_offset = 0  
+    if wobble_start_time:  
+        wobble_elapsed = time.time() - wobble_start_time  
+        if wobble_elapsed < wobble_duration:  
+            wobble_offset = math.sin(wobble_elapsed * 10) * 5  
+        else:  
+            wobble_start_time = None  # End wobble effect  
+  
+    # Draw the cookie with wobble effect  
+    screen.blit(cookie_image, (30 + wobble_offset, 200))  
+  
+    # Draw squares and add text with costs  
+    for i in range(num_squares):  
+        x = start_x + (i % 4) * square_width  
+        y = start_y + (i // 4) * square_height  
+        if purchased[i]:  
+            pygame.draw.rect(screen, (169, 169, 169), (x, y, square_width, square_height))  # Grey if purchased  
+        else:  
+            pygame.draw.rect(screen, (255, 255, 255), (x, y, square_width, square_height), 2)  
+            text = font_box.render(f"Cost: {costs[i]}", True, (0, 0, 0))  
+            screen.blit(text, (x + 5, y + 30))  # Smaller text to fit in the box  
+  
+    # Draw additional boxes  
+    for box in additional_boxes:  
+        pygame.draw.rect(screen, (0, 128, 128), (box["x"], box["y"], additional_box_width, additional_box_height))  # Teal background  
+        name_text = font_box.render(box["name"], True, (0, 0, 0))  
+        cost_text = font_box.render(f"Cost: {box['cost']}", True, (0, 0, 0))  
+        purchase_text = font_box.render(f"Purchased: {box['purchases']}", True, (0, 0, 0))  
+        screen.blit(name_text, (box["x"] + 5, box["y"] + 5))  
+        screen.blit(cost_text, (box["x"] + 5, box["y"] + 30))  
+        screen.blit(purchase_text, (box["x"] + 5, box["y"] + 55))  
+  
+    pygame.display.flip()  
+  
+pygame.quit()  
